@@ -115,7 +115,10 @@ exist:()=>`${back()}<div class="card"><h2>Existing BD</h2>${M()}<label>SAP MO nu
  <div class="row"><button class="p" onclick="findMO()">Search</button></div></div>`,
 master:()=>`${back()}<div class="card"><h2>Vehicle master (${S.vehs.length})</h2>${M()}
  <input id="vq" placeholder="Search vehicle number or barcode" value="${esc(ui.vq||'')}" oninput="ui.vq=this.value;vlist()">
- <div class="row"><button class="p" onclick="go('vadd')">+ Add vehicle</button></div><div id="vl" class="w" style="margin-top:8px"></div></div>`,
+ <div class="row"><button class="p" onclick="go('vadd')">+ Add vehicle</button></div><div id="vl" class="w" style="margin-top:8px"></div></div>
+ <div class="card"><h2>Move vehicles between devices</h2><div class="mu">Export on the device where vehicles were added, copy the text, paste it on the other device and tap Import.</div>
+ <textarea id="xio" rows="4" style="width:100%;margin-top:8px;border:1px solid var(--bd);border-radius:12px;padding:8px;background:var(--bg);color:var(--tx);font:12px monospace"></textarea>
+ <div class="row"><button onclick="exportData()">Export</button><button class="p" onclick="importData()">Import</button></div><div id="xmsg"></div></div>`,
 vadd:()=>`${back('master')}<div class="card"><h2>Add vehicle</h2>
  <label>Vehicle number</label><input id="vn" placeholder="e.g. WB-12-AB-3456" style="text-transform:uppercase">
  <label>Number of axles</label><select id="na" onchange="drawAx()">${[2,3,4,5,6].map(n=>`<option ${n===4?'selected':''}>${n}</option>`).join('')}</select>
@@ -205,7 +208,12 @@ async function startCam(){scanOn=true;const st=$('camst');if(!st)return;
  Quagga.onDetected(r=>{if(!scanOn)return;const c=r.codeResult&&r.codeResult.code;if(!c)return;
   const e=(r.codeResult.decodedCodes||[]).filter(x=>x.error!==undefined).map(x=>x.error);const avg=e.length?e.reduce((a,b)=>a+b,0)/e.length:0;
   if(avg>0.15)return;if(c===lastC)cnt++;else{lastC=c;cnt=1}
-  st.textContent='Reading: '+c+' ('+cnt+'/2)';if(cnt>=2){scanOn=false;doScan(c)}})}
+  st.textContent='Reading: '+c+' ('+cnt+'/3)';if(cnt>=3){scanOn=false;doScan(c)}})}
+function exportData(){const t=$('xio');t.value=JSON.stringify({vehs:S.vehs,tyres:S.tyres});t.select();try{document.execCommand('copy')}catch(e){}$('xmsg').innerHTML='<div class="msg ok">Exported '+S.vehs.length+' vehicle(s). Copy the text above.</div>'}
+function importData(){let d;try{d=JSON.parse($('xio').value)}catch(e){return $('xmsg').innerHTML='<div class="msg er">Paste the exported text first.</div>'}
+ if(!d||!Array.isArray(d.vehs))return $('xmsg').innerHTML='<div class="msg er">Invalid data.</div>';let n=0;
+ d.vehs.forEach(v=>{if(S.vehs.some(x=>x.no===v.no||x.barcode===v.barcode))return;Object.values(v.map).forEach(sr=>{if(!S.tyres[sr]&&d.tyres[sr])S.tyres[sr]=d.tyres[sr]});S.vehs.push(v);n++});
+ save();vlist();$('xmsg').innerHTML='<div class="msg ok">Imported '+n+' new vehicle(s); existing ones were skipped.</div>'}
 function vlist(){const q=(ui.vq||'').toUpperCase();const l=S.vehs.filter(v=>!q||v.no.includes(q)||v.barcode.includes(q));
  $('vl').innerHTML='<table><tr><th>Vehicle</th><th>Barcode</th><th>Axles</th><th></th></tr>'+(l.map(v=>`<tr><td><b>${esc(v.no)}</b></td><td>${esc(v.barcode)}</td><td>${v.axles.length}</td><td><button onclick="go('vdet',{vid:'${v.id}'})">Barcode / View</button></td></tr>`).join('')||'<tr><td colspan="4">No vehicles</td></tr>')+'</table>'}
 function drawAx(){const n=+$('na').value;$('axf').innerHTML=Array.from({length:n},(_,i)=>`<div class="mu" style="margin-top:6px">Axle ${i+1}</div><div class="row"><input id="s${i+1}L" placeholder="A${i+1} LHS serial"><input id="s${i+1}R" placeholder="A${i+1} RHS serial"></div>`).join('')}
@@ -220,7 +228,7 @@ function saveVeh(){const no=$('vn').value.trim().toUpperCase(),n=+$('na').value,
  Object.entries(map).forEach(([p,x])=>{S.tyres[x]={serial:x,make:$('tm').value.trim(),size:$('ts').value.trim(),bucket:'Fitted',pos:p,nsd,life:0,lastFit:ts,lastInsp:ts};S.hist.push({serial:x,ev:'FIT',veh:no,pos:p,bd:'MASTER',ts})});
  S.vehs.push(v);save();go('vdet',{vid:v.id})}
 function doScan(code){code=(code||'').trim();
- cv=S.vehs.find(v=>v.barcode===code);if(!cv)return go('scan',{msg:{t:'Unknown barcode "'+code+'".',c:'er'}});
+ cv=S.vehs.find(v=>v.barcode===code);if(!cv)return go('scan',{msg:{t:'Unknown barcode "'+code+'". Vehicles are saved per device/browser. If it was added on another device, use Vehicle master → Export there and Import here.',c:'er'}});
  if(bd.barcode&&bd.barcode!==code)return go('scan',{msg:{t:'This vehicle does not belong to the selected MO/BD.',c:'er'}});
  bd.barcode=code;save();go('veh')}
 function removeTyre(){const p=ui.pos,t=S.tyres[cv.map[p]],n=parseFloat($('nn').value);
