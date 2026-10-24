@@ -61,7 +61,7 @@ const CFG={sapMock:true,sapUrl:'/api/sap/bd-mo',
  addCuts:['Standard cut','Deep cut','Re-groove'],
  avail:['New Stock','Reusable Stock'],
  conds:{'Good – reusable':'Reusable Stock','Worn – send for retread':'Retread Pending','Damaged – repair':'Repair','Beyond repair – scrap':'Scrap'}};
-const K='tyreapp.v1';let mem=null;
+const K='tyreapp.v1';const cvPos=()=>cv.axles.flatMap(a=>a.pos);let mem=null;
 const POS=[];for(let a=1;a<=4;a++)['LHS','RHS'].forEach(s=>POS.push('A'+a+'-'+s));
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fd=t=>t?new Date(t).toLocaleString():'—';
@@ -77,9 +77,10 @@ function seed(){const tyres={},map={},hist=[];
  const openTs=new Date(Date.now()-36e5).toISOString();
  return{veh:{no:'WB-12-AB-3456',barcode:'TYR-VEH-0001',axles:[1,2,3,4].map(a=>({id:'A'+a,name:'Axle '+a,pos:['A'+a+'-LHS','A'+a+'-RHS']}))},
   map,tyres,hist,bds:{},sap:{seq:1,mos:{'4000001':{mo:'4000001',bdNo:'BD900001',barcode:'TYR-VEH-0001',orderType:CFG.orderTypes[0],bdType:CFG.bdTypes[0],openTs}},byKey:{}}}}
+function norm(x){if(x.veh&&!x.vehs){x.veh.id='V1';x.veh.map=x.map;x.vehs=[x.veh];delete x.veh;delete x.map}return x}
 function load(){try{const j=localStorage.getItem(K);if(j)return JSON.parse(j)}catch(e){}return mem||seed()}
 function save(){mem=S;try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
-let S=load(),ui={s:'home'},bd=null,busy=false,stream=null,scanOn=false;
+let S=norm(load()),cv=null,ui={s:'home'},bd=null,busy=false,stream=null,scanOn=false;
 
 /* ===== Mock SAP (idempotent). Set CFG.sapMock=false to call the real endpoint ===== */
 async function sapCall(p){
@@ -112,17 +113,26 @@ newbd:()=>`${back()}<div class="card"><h2>New BD</h2>${M()}
  <div class="row"><button class="p" onclick="openBD()">Open</button></div></div>`,
 exist:()=>`${back()}<div class="card"><h2>Existing BD</h2>${M()}<label>SAP MO number</label><input id="mo" inputmode="numeric" placeholder="e.g. 4000001">
  <div class="row"><button class="p" onclick="findMO()">Search</button></div></div>`,
-master:()=>`${back()}<div class="card"><h2>Vehicle master</h2>
- <div>Vehicle: <b>${esc(S.veh.no)}</b> · Barcode: <b>${esc(S.veh.barcode)}</b> (permanent)</div>
- <div id="bc" style="margin:10px 0;background:#fff;color:#000;display:inline-block;padding:6px;overflow-x:auto;max-width:100%"><svg id="bcs"></svg><div>${esc(S.veh.no)}</div></div>
- <button onclick="print()">Print barcode</button>
- <div class="w" style="margin-top:12px"><table><tr><th>Axle</th><th>LHS</th><th>RHS</th></tr>${S.veh.axles.map(a=>`<tr><td>${a.name}</td><td>${a.pos[0]}</td><td>${a.pos[1]}</td></tr>`).join('')}</table></div>
- <div class="mu">Tyres are not stored on the barcode; the axle-position mapping below is dynamic.</div></div>`,
+master:()=>`${back()}<div class="card"><h2>Vehicle master (${S.vehs.length})</h2>${M()}
+ <input id="vq" placeholder="Search vehicle number or barcode" value="${esc(ui.vq||'')}" oninput="ui.vq=this.value;vlist()">
+ <div class="row"><button class="p" onclick="go('vadd')">+ Add vehicle</button></div><div id="vl" class="w" style="margin-top:8px"></div></div>`,
+vadd:()=>`${back('master')}<div class="card"><h2>Add vehicle</h2>
+ <label>Vehicle number</label><input id="vn" placeholder="e.g. WB-12-AB-3456" style="text-transform:uppercase">
+ <label>Number of axles</label><select id="na" onchange="drawAx()">${[2,3,4,5,6].map(n=>`<option ${n===4?'selected':''}>${n}</option>`).join('')}</select>
+ <label>Tyre make / size / initial NSD (mm)</label><div class="row"><input id="tm" placeholder="Make" value="MRF"><input id="ts" placeholder="Size" value="295/80R22.5"><input id="tn" type="number" step="0.1" value="12"></div>
+ <label>Tyre serial numbers fitted now</label><div id="axf"></div><div id="verr"></div>
+ <div class="mu" style="margin-top:8px">The permanent barcode is generated and saved automatically.</div>
+ <div class="row"><button class="p" onclick="saveVeh()">Save vehicle &amp; generate barcode</button></div></div>`,
+vdet:()=>{const v=S.vehs.find(x=>x.id===ui.vid);return `${back('master')}<div class="card"><h2>${esc(v.no)}</h2><div class="mu">Permanent barcode: <b>${esc(v.barcode)}</b></div>
+ <div id="bc" style="margin:10px 0;background:#fff;color:#000;display:inline-block;padding:6px;overflow-x:auto;max-width:100%"><svg id="bcs"></svg><div>${esc(v.no)}</div></div>
+ <div class="row"><button class="p" onclick="print()">Print barcode</button></div>
+ <div class="w" style="margin-top:12px"><table><tr><th>Axle</th><th>LHS tyre</th><th>RHS tyre</th></tr>${v.axles.map(a=>`<tr><td>${a.name}</td>${a.pos.map(p=>`<td>${p}: <b>${v.map[p]||'—'}</b></td>`).join('')}</tr>`).join('')}</table></div>
+ <div class="mu">Tyres shown are the ones currently fitted; the barcode never changes.</div></div>`},
 scan:()=>`${back(bd.mo?'exist':'home')}<div class="card"><h2>Scan vehicle barcode</h2><div class="mu">${bdTag()}</div>${M()}
  <div id="reader" style="width:100%;min-height:220px;background:#000;border-radius:8px"></div><div class="row"><button class="p" onclick="startCam()">Start camera</button><button onclick="stopCam();$('camst').textContent='Camera stopped.'">Stop</button></div><div class="mu" id="camst">Starting camera…</div>
  <div class="mu">Test: open “Vehicle master &amp; barcode” on another screen and point the camera at it.</div>
- <label>Or enter barcode manually</label><input id="mb" placeholder="${esc(S.veh.barcode)}"><div class="row"><button class="p" onclick="doScan($('mb').value)">Load vehicle</button><button onclick="doScan(S.veh.barcode)">Trial: use sample barcode</button></div></div>`,
-veh:()=>{const v=S.veh,act=bd.status==='OPEN';const tile=p=>{const t=S.tyres[S.map[p]],fitted=bd.fitments.some(f=>f.pos===p);
+ <label>Or enter barcode manually</label><input id="mb" placeholder="TYR-VEH-0001"><div class="row"><button class="p" onclick="doScan($('mb').value)">Load vehicle</button><button onclick="doScan(S.vehs[0].barcode)">Trial: use sample barcode</button></div></div>`,
+veh:()=>{const v=cv,act=bd.status==='OPEN';const tile=p=>{const t=S.tyres[cv.map[p]],fitted=bd.fitments.some(f=>f.pos===p);
  if(!t)return `<div class="tile empty"><div class="pos">${p}</div><div class="ser er">EMPTY</div>${act?`<button class="p" onclick="go('veh',{panel:'fit',pos:'${p}'})">Fit tyre</button>`:''}</div>`;
  const pc=Math.max(4,Math.min(100,t.nsd/16*100)),col=t.nsd<4?'var(--er)':t.nsd<8?'var(--wa)':'var(--ok)';
  return `<div class="tile ${ui.pos===p&&ui.panel?'sel':''}"><div class="pos">${p}${fitted?' · <span class="ok">NEW</span>':''}</div><div class="ser">${t.serial}</div>
@@ -154,7 +164,7 @@ const bdTag=()=>`BD ${esc(bd.id)}${bd.mo?' · MO '+esc(bd.mo):''} · ${esc(bd.or
 const syncOK=()=>bd.sync&&bd.sync.status==='SUCCESS'&&bd.sync.key===curKey();
 const curKey=()=>bd.id+'-'+bd.removals.length+'-'+bd.fitments.length;
 const syncBox=()=>bd.sync?`<div class="msg ${bd.sync.status==='SUCCESS'?'ok':bd.sync.status==='FAILED'?'er':'wa'}"><b>SAP sync: ${bd.sync.status}</b><br>${esc(bd.sync.message||'')}${bd.sync.resp?`<pre>${esc(JSON.stringify(bd.sync.resp,null,1))}</pre>`:''}</div>`:'';
-function rmPanel(){const t=S.tyres[S.map[ui.pos]];return `<div class="card"><h2>Inspect &amp; remove – ${ui.pos}</h2><div>Tyre <b>${t.serial}</b> · existing NSD <b>${t.nsd}</b> mm</div>
+function rmPanel(){const t=S.tyres[cv.map[ui.pos]];return `<div class="card"><h2>Inspect &amp; remove – ${ui.pos}</h2><div>Tyre <b>${t.serial}</b> · existing NSD <b>${t.nsd}</b> mm</div>
  <label>Newly measured NSD (mm)</label><input id="nn" type="number" step="0.1" min="0" max="30">
  <label>Tyre condition → inventory bucket</label><select id="cd">${Object.entries(CFG.conds).map(([k,v])=>`<option value="${esc(k)}">${esc(k)} → ${esc(v)}</option>`).join('')}</select>
  <div class="row"><button class="p" onclick="removeTyre()">Remove tyre</button><button onclick="go('veh')">Cancel</button></div></div>`}
@@ -170,7 +180,7 @@ function fitPanel(){const q=(ui.q||'').toUpperCase();const l=Object.values(S.tyr
 
 function render(){if(ui.s==='home'||ui.s==='newbd'||ui.s==='exist'||ui.s==='master'){}
  $('top').innerHTML=hdr();$('app').innerHTML=V[ui.s]();
- if(ui.s==='master')try{JsBarcode('#bcs',S.veh.barcode,{format:'CODE128',width:3,height:110,margin:20,displayValue:true,background:'#ffffff',lineColor:'#000000'})}catch(e){}
+ if(ui.s==='vdet')try{JsBarcode('#bcs',S.vehs.find(x=>x.id===ui.vid).barcode,{format:'CODE128',width:3,height:110,margin:20,displayValue:true,background:'#ffffff',lineColor:'#000000'})}catch(e){}if(ui.s==='master')vlist();if(ui.s==='vadd')drawAx();
  if(ui.s==='scan')startCam();msg(null)}
 
 /* ===== Actions ===== */
@@ -196,41 +206,54 @@ async function startCam(){scanOn=true;const st=$('camst');if(!st)return;
   const e=(r.codeResult.decodedCodes||[]).filter(x=>x.error!==undefined).map(x=>x.error);const avg=e.length?e.reduce((a,b)=>a+b,0)/e.length:0;
   if(avg>0.15)return;if(c===lastC)cnt++;else{lastC=c;cnt=1}
   st.textContent='Reading: '+c+' ('+cnt+'/2)';if(cnt>=2){scanOn=false;doScan(c)}})}
+function vlist(){const q=(ui.vq||'').toUpperCase();const l=S.vehs.filter(v=>!q||v.no.includes(q)||v.barcode.includes(q));
+ $('vl').innerHTML='<table><tr><th>Vehicle</th><th>Barcode</th><th>Axles</th><th></th></tr>'+(l.map(v=>`<tr><td><b>${esc(v.no)}</b></td><td>${esc(v.barcode)}</td><td>${v.axles.length}</td><td><button onclick="go('vdet',{vid:'${v.id}'})">Barcode / View</button></td></tr>`).join('')||'<tr><td colspan="4">No vehicles</td></tr>')+'</table>'}
+function drawAx(){const n=+$('na').value;$('axf').innerHTML=Array.from({length:n},(_,i)=>`<div class="mu" style="margin-top:6px">Axle ${i+1}</div><div class="row"><input id="s${i+1}L" placeholder="A${i+1} LHS serial"><input id="s${i+1}R" placeholder="A${i+1} RHS serial"></div>`).join('')}
+function saveVeh(){const no=$('vn').value.trim().toUpperCase(),n=+$('na').value,nsd=parseFloat($('tn').value);
+ const er=m=>{$('verr').innerHTML='<div class="msg er">'+esc(m)+'</div>'};
+ if(!no)return er('Enter the vehicle number.');if(S.vehs.some(v=>v.no===no))return er('This vehicle number already exists.');if(isNaN(nsd)||nsd<0)return er('Enter a valid initial NSD.');
+ const ser=[],axles=[],map={};
+ for(let i=1;i<=n;i++){const pos=['A'+i+'-LHS','A'+i+'-RHS'];axles.push({id:'A'+i,name:'Axle '+i,pos});
+  for(const [k,p] of [['L',pos[0]],['R',pos[1]]]){const x=$('s'+i+k).value.trim().toUpperCase();if(!x)return er('Enter the tyre serial for '+p+'.');if(ser.includes(x)||S.tyres[x])return er('Tyre serial '+x+' is duplicate or already exists.');ser.push(x);map[p]=x}}
+ const num=Math.max(0,...S.vehs.map(v=>parseInt(v.barcode.slice(-4))||0))+1,ts=now().toISOString();
+ const v={id:'V'+Date.now().toString(36),no,barcode:'TYR-VEH-'+String(num).padStart(4,'0'),axles,map};
+ Object.entries(map).forEach(([p,x])=>{S.tyres[x]={serial:x,make:$('tm').value.trim(),size:$('ts').value.trim(),bucket:'Fitted',pos:p,nsd,life:0,lastFit:ts,lastInsp:ts};S.hist.push({serial:x,ev:'FIT',veh:no,pos:p,bd:'MASTER',ts})});
+ S.vehs.push(v);save();go('vdet',{vid:v.id})}
 function doScan(code){code=(code||'').trim();
- if(code!==S.veh.barcode)return go('scan',{msg:{t:'Unknown barcode "'+code+'".',c:'er'}});
+ cv=S.vehs.find(v=>v.barcode===code);if(!cv)return go('scan',{msg:{t:'Unknown barcode "'+code+'".',c:'er'}});
  if(bd.barcode&&bd.barcode!==code)return go('scan',{msg:{t:'This vehicle does not belong to the selected MO/BD.',c:'er'}});
  bd.barcode=code;save();go('veh')}
-function removeTyre(){const p=ui.pos,t=S.tyres[S.map[p]],n=parseFloat($('nn').value);
+function removeTyre(){const p=ui.pos,t=S.tyres[cv.map[p]],n=parseFloat($('nn').value);
  if(isNaN(n)||n<0||n>30)return go('veh',{panel:'rm',pos:p,msg:{t:'Enter a valid new NSD.',c:'er'}});
  const cond=$('cd').value,bucket=CFG.conds[cond],ts=now().toISOString();
  bd.removals.push({pos:p,serial:t.serial,oldNsd:t.nsd,newNsd:n,cond,bucket,ts});
- t.nsd=n;t.lastInsp=ts;t.bucket=bucket;t.pos=null;S.map[p]=null;
- S.hist.push({serial:t.serial,ev:'REMOVE',pos:p,bd:bd.id,ts,nsd:n,bucket});save();go('veh',{panel:'fit',pos:p,msg:{t:t.serial+' removed → '+bucket+'. Now fit a replacement.',c:'ok'}})}
+ t.nsd=n;t.lastInsp=ts;t.bucket=bucket;t.pos=null;cv.map[p]=null;
+ S.hist.push({serial:t.serial,ev:'REMOVE',veh:cv.no,pos:p,bd:bd.id,ts,nsd:n,bucket});save();go('veh',{panel:'fit',pos:p,msg:{t:t.serial+' removed → '+bucket+'. Now fit a replacement.',c:'ok'}})}
 function fitTyre(){const p=ui.pos,t=S.tyres[ui.sel],n=parseFloat($('fn').value),ac=$('ac').value;
  const e=m=>go('veh',{panel:'fit',pos:p,sel:ui.sel,q:ui.q,msg:{t:m,c:'er'}});
- if(S.map[p])return e('Position is not empty.');if(!t||!CFG.avail.includes(t.bucket))return e('Tyre is not available for fitment.');
+ if(cv.map[p])return e('Position is not empty.');if(!t||!CFG.avail.includes(t.bucket))return e('Tyre is not available for fitment.');
  if(isNaN(n)||n<0)return e('Enter a valid NSD.');if(!ac)return e('Select an Add Cut Type.');
  const ts=now().toISOString();bd.fitments.push({pos:p,serial:t.serial,nsd:n,addCut:ac,ts});
- t.nsd=n;t.bucket='Fitted';t.pos=p;t.lastFit=ts;t.lastInsp=ts;S.map[p]=t.serial;
- S.hist.push({serial:t.serial,ev:'FIT',pos:p,bd:bd.id,ts,nsd:n,addCut:ac});save();go('veh',{msg:{t:t.serial+' fitted to '+p,c:'ok'}})}
+ t.nsd=n;t.bucket='Fitted';t.pos=p;t.lastFit=ts;t.lastInsp=ts;cv.map[p]=t.serial;
+ S.hist.push({serial:t.serial,ev:'FIT',veh:cv.no,pos:p,bd:bd.id,ts,nsd:n,addCut:ac});save();go('veh',{msg:{t:t.serial+' fitted to '+p,c:'ok'}})}
 function checks(){const e=[];if(!bd.removals.length&&!bd.fitments.length)e.push('No tyre transactions recorded.');
  const fs=new Set();bd.removals.forEach(r=>{if(!bd.fitments.some(f=>f.pos===r.pos))e.push('Removed tyre '+r.serial+' at '+r.pos+' has no replacement.');
-  if(r.newNsd==null||!r.bucket)e.push('Removal at '+r.pos+' missing NSD/bucket.');const t=S.tyres[r.serial];if(t.bucket!==r.bucket||S.map[r.pos]===r.serial)e.push('Inventory mismatch for removed tyre '+r.serial)});
+  if(r.newNsd==null||!r.bucket)e.push('Removal at '+r.pos+' missing NSD/bucket.');const t=S.tyres[r.serial];if(t.bucket!==r.bucket||cv.map[r.pos]===r.serial)e.push('Inventory mismatch for removed tyre '+r.serial)});
  bd.fitments.forEach(f=>{if(!bd.removals.some(r=>r.pos===f.pos))e.push('Fitment at '+f.pos+' has no recorded removal.');
-  if(S.map[f.pos]!==f.serial||S.tyres[f.serial].bucket!=='Fitted')e.push('Axle map/inventory mismatch for '+f.serial);
+  if(cv.map[f.pos]!==f.serial||S.tyres[f.serial].bucket!=='Fitted')e.push('Axle map/inventory mismatch for '+f.serial);
   if(!f.addCut)e.push('Add Cut Type missing at '+f.pos);if(f.nsd==null||isNaN(f.nsd))e.push('NSD missing at '+f.pos);
   if(fs.has(f.serial))e.push('Duplicate tyre '+f.serial);fs.add(f.serial)});return e}
 async function submitSAP(){if(busy||syncOK()||checks().length)return;busy=true;const key=curKey();
  bd.sync={status:'PENDING',key,message:'Waiting for SAP…'};save();render();
- const payload={idempotencyKey:key,moNo:bd.mo,orderType:bd.orderType,bdType:bd.bdType,openTs:bd.openTs,vehicleNo:S.veh.no,barcode:bd.barcode,removals:bd.removals,fitments:bd.fitments};
+ const payload={idempotencyKey:key,moNo:bd.mo,orderType:bd.orderType,bdType:bd.bdType,openTs:bd.openTs,vehicleNo:cv.no,barcode:bd.barcode,removals:bd.removals,fitments:bd.fitments};
  try{const r=await sapCall(payload);
   if(r&&r.status==='S'&&r.bdNo&&r.moNo){bd.mo=r.moNo;bd.sapBdNo=r.bdNo;bd.sync={status:'SUCCESS',key,message:r.message,resp:r}}
   else bd.sync={status:'FAILED',key,message:(r&&r.message)||'Invalid or unsuccessful SAP response',resp:r}}
  catch(e){bd.sync={status:'FAILED',key,message:'API error: '+e.message}}
  busy=false;save();go('final')}
-function closeChecks(){const c=[];const empty=POS.filter(p=>!S.map[p]);
+function closeChecks(){const c=[];const empty=cvPos().filter(p=>!cv.map[p]);
  c.push([!empty.length,'Every axle position has a tyre mounted'+(empty.length?' (empty: '+empty.join(', ')+')':'')]);
- const bad=POS.filter(p=>S.map[p]&&(S.tyres[S.map[p]].bucket!=='Fitted'||S.tyres[S.map[p]].pos!==p));
+ const bad=cvPos().filter(p=>cv.map[p]&&(S.tyres[cv.map[p]].bucket!=='Fitted'||S.tyres[cv.map[p]].pos!==p));
  c.push([!bad.length,'Axle mapping consistent with inventory']);
  c.push([!checks().length&&(bd.removals.length+bd.fitments.length)>0,'All removals and fitments complete']);
  c.push([syncOK(),'Data synchronized successfully with SAP'+(bd.sync?' (status '+bd.sync.status+')':' (not submitted)')]);
