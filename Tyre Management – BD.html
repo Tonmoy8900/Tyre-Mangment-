@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tyre Management – BD</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700&display=swap">
+<style>
+:root{color-scheme:light dark;--bg:#eef2f1;--card:#fff;--tx:#10201f;--mu:#5b6d6b;--bd:#d5dedd;--ac:#0b6e69;--acx:#fff;--am:#f0a202;--ok:#13804a;--er:#c2352b;--wa:#a86a00;--hd:#10201f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0c1413;--card:#142120;--tx:#e8f1f0;--mu:#8fa5a2;--bd:#27403d;--ac:#35b5ac;--acx:#06201e;--ok:#4cc88a;--er:#ff7b6e;--wa:#f0b840;--hd:#060d0c}}
+:root[data-theme="dark"]{--bg:#0c1413;--card:#142120;--tx:#e8f1f0;--mu:#8fa5a2;--bd:#27403d;--ac:#35b5ac;--acx:#06201e;--ok:#4cc88a;--er:#ff7b6e;--wa:#f0b840;--hd:#060d0c}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--hd);z-index:10}
+#top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--hd);color:#fff;border-bottom:3px solid var(--am)}
+.hb{max-width:820px;margin:0 auto;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lg{display:flex;gap:10px;align-items:center}.lg b{font:700 17px Sora,system-ui,sans-serif;letter-spacing:.3px;display:block;line-height:1.1}.lg small{color:#9fb5b2;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+.chip{background:#ffffff1f;border:1px solid #ffffff33;border-radius:99px;padding:3px 10px;font-size:12px}
+.steps{max-width:820px;margin:0 auto;padding:0 14px 10px;display:flex;gap:4px;overflow-x:auto}
+.steps span{flex:1;min-width:64px;font-size:11px;color:#9fb5b2;text-align:center;border-top:3px solid #ffffff2a;padding-top:5px}
+.steps i{display:inline-block;width:16px;height:16px;border-radius:50%;background:#ffffff22;font-style:normal;line-height:16px;margin-right:4px;font-size:10px}
+.steps .dn{border-color:var(--ac);color:#fff}.steps .dn i{background:var(--ac);color:var(--acx)}
+.steps .ac{border-color:var(--am);color:#fff;font-weight:700}.steps .ac i{background:var(--am);color:#10201f}
+main{max-width:820px;margin:0 auto;padding:16px 14px 40px}
+h1{font:700 24px/1.2 Sora,system-ui,sans-serif;margin:6px 0}h2{font:700 17px Sora,system-ui,sans-serif;margin:0 0 8px}
+.hero p{color:var(--mu);margin:0 0 14px;max-width:520px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 1px 2px #0000000d}
+.mu{color:var(--mu);font-size:13px}.ok{color:var(--ok)}.er{color:var(--er)}.wa{color:var(--wa)}
+button{font:inherit;font-weight:600;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:12px;padding:10px 16px;cursor:pointer}
+button:hover{border-color:var(--ac)}button.p{background:var(--ac);border-color:var(--ac);color:var(--acx)}button:disabled{opacity:.45;cursor:not-allowed}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:8px 0 14px}
+.tl{text-align:left;padding:20px 16px;border-radius:18px;display:flex;flex-direction:column;gap:4px;min-height:140px}
+.tl .ic{font-size:30px;line-height:1;color:var(--am)}.tl b{font:700 18px Sora,system-ui,sans-serif}.tl small{font-weight:400;opacity:.8}
+.tl.pri{background:var(--hd);color:#fff;border-color:var(--hd)}.tl.pri small{color:#b8cbc8}
+@media(max-width:480px){.tiles{grid-template-columns:1fr}.tl{min-height:0}}
+label{display:block;margin:12px 0 4px;font-size:12px;font-weight:600;color:var(--mu);text-transform:uppercase;letter-spacing:.5px}
+input,select{width:100%;font:inherit;padding:11px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);color:var(--tx)}
+input:focus,select:focus{outline:2px solid var(--ac);border-color:transparent}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.row>*{flex:1}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--bd);white-space:nowrap}th{color:var(--mu);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.msg{padding:11px 13px;border-radius:12px;margin:10px 0;border:1px solid var(--bd);background:var(--card);border-left:5px solid var(--mu)}
+.msg.ok{border-left-color:var(--ok)}.msg.er{border-left-color:var(--er)}.msg.wa{border-left-color:var(--wa)}
+pre{white-space:pre-wrap;font-size:12px;background:var(--bg);padding:8px;border-radius:8px;overflow-x:auto}
+.vh{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;flex-wrap:wrap}.vh small{color:var(--mu);font-size:11px;letter-spacing:.8px}.vh h2{font-size:22px;margin:0}
+.axle{display:grid;grid-template-columns:1fr 22px 1fr;align-items:center;margin:10px 0}.al{grid-column:1/-1;font-size:11px;color:var(--mu);letter-spacing:.8px;text-transform:uppercase;margin-bottom:4px}
+.shaft{height:10px;background:repeating-linear-gradient(90deg,var(--bd) 0 6px,transparent 6px 9px);border-radius:4px}
+.tile{background:var(--card);border:1px solid var(--bd);border-left:6px solid var(--ac);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.tile.empty{border-left-color:var(--er);border-style:dashed;align-items:flex-start;justify-content:center;min-height:120px}.tile.sel{outline:2px solid var(--am)}
+.pos{font-size:11px;font-weight:700;color:var(--mu);letter-spacing:.6px}.ser{font:700 17px Sora,system-ui,sans-serif}
+.tile button{padding:7px 8px;font-size:13px;width:100%}.bar{height:7px;border-radius:4px;background:var(--bg);overflow:hidden}.bar i{display:block;height:100%}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:1px 8px;font-size:12px}.kv span{color:var(--mu)}.kv b{font-weight:600;text-align:right}
+#reader{position:relative;overflow:hidden;border-radius:12px}#reader video{width:100%;display:block}#reader canvas{display:none}#reader::after{content:"";position:absolute;left:3%;right:3%;top:50%;border-top:2px solid #f33}
+@media print{body *{visibility:hidden}#bc,#bc *{visibility:visible}#bc{position:absolute;left:0;top:0}}
+</style></head><body><header id="top"></header><main id="app"></main>
+<script>
+/* ===== Configuration (SAP integration) ===== */
+const CFG={sapMock:true,sapUrl:'/api/sap/bd-mo',
+ orderTypes:['PM01 – Breakdown maintenance','PM02 – Corrective maintenance'],
+ bdTypes:['Tyre puncture','Tyre burst','Abnormal wear','Other'],
+ addCuts:['Standard cut','Deep cut','Re-groove'],
+ avail:['New Stock','Reusable Stock'],
+ conds:{'Good – reusable':'Reusable Stock','Worn – send for retread':'Retread Pending','Damaged – repair':'Repair','Beyond repair – scrap':'Scrap'}};
+const K='tyreapp.v1';let mem=null;
+const POS=[];for(let a=1;a<=4;a++)['LHS','RHS'].forEach(s=>POS.push('A'+a+'-'+s));
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fd=t=>t?new Date(t).toLocaleString():'—';
+let off=0;const now=()=>new Date(Date.now()+off);
+const loc=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+async function syncTime(){try{const r=await fetch(location.href,{method:'HEAD',cache:'no-store'});const h=r.headers.get('date');if(h)off=new Date(h)-Date.now()}catch(e){}}
+const okTime=v=>v&&!isNaN(new Date(v))&&Math.abs(new Date(v)-now())<=600000;
+
+function seed(){const tyres={},map={},hist=[];
+ POS.forEach((p,i)=>{const s='C'+(123455+i);map[p]=s;tyres[s]={serial:s,make:'MRF',size:'295/80R22.5',bucket:'Fitted',pos:p,nsd:10+(i%4),life:42000+i*1800,lastFit:'2026-03-0'+(i+1)+'T09:00:00Z',lastInsp:'2026-09-1'+i+'T10:00:00Z'};
+  hist.push({serial:s,ev:'FIT',pos:p,bd:'INIT',ts:tyres[s].lastFit})});
+ [['D123456','New Stock',16],['D123457','New Stock',16],['D123458','New Stock',15],['D123459','Reusable Stock',9],['D123460','Retread Pending',3],['D123461','Scrap',1]].forEach(([s,b,n])=>tyres[s]={serial:s,make:'MRF',size:'295/80R22.5',bucket:b,nsd:n,life:b==='New Stock'?0:30000,lastFit:null,lastInsp:null});
+ const openTs=new Date(Date.now()-36e5).toISOString();
+ return{veh:{no:'WB-12-AB-3456',barcode:'TYR-VEH-0001',axles:[1,2,3,4].map(a=>({id:'A'+a,name:'Axle '+a,pos:['A'+a+'-LHS','A'+a+'-RHS']}))},
+  map,tyres,hist,bds:{},sap:{seq:1,mos:{'4000001':{mo:'4000001',bdNo:'BD900001',barcode:'TYR-VEH-0001',orderType:CFG.orderTypes[0],bdType:CFG.bdTypes[0],openTs}},byKey:{}}}}
+function load(){try{const j=localStorage.getItem(K);if(j)return JSON.parse(j)}catch(e){}return mem||seed()}
+function save(){mem=S;try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
+let S=load(),ui={s:'home'},bd=null,busy=false,stream=null,scanOn=false;
+
+/* ===== Mock SAP (idempotent). Set CFG.sapMock=false to call the real endpoint ===== */
+async function sapCall(p){
+ if(!CFG.sapMock){const r=await fetch(CFG.sapUrl,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':p.idempotencyKey},body:JSON.stringify(p)});return await r.json()}
+ await new Promise(r=>setTimeout(r,800));
+ if(S.sap.byKey[p.idempotencyKey])return S.sap.byKey[p.idempotencyKey];
+ if(!p.removals.length||!p.fitments.length)return{status:'E',message:'No tyre transactions in payload'};
+ let m=p.moNo&&S.sap.mos[p.moNo];
+ if(!m){const n=4000001+ ++S.sap.seq-1;m=S.sap.mos[n]={mo:String(n),bdNo:'BD'+(900000+S.sap.seq),barcode:p.barcode,orderType:p.orderType,bdType:p.bdType,openTs:p.openTs}}
+ const r={status:'S',bdNo:m.bdNo,moNo:m.mo,message:'BD '+m.bdNo+' / MO '+m.mo+' processed'};S.sap.byKey[p.idempotencyKey]=r;save();return r}
+
+/* ===== Navigation ===== */
+function stopCam(){scanOn=false;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}qStop()}
+function go(s,x){stopCam();ui={s,...x};render()}
+function msg(t,c){ui.msg=t?{t,c}:null}
+const M=()=>ui.msg?`<div class="msg ${ui.msg.c||''}">${esc(ui.msg.t)}</div>`:'';
+const back=(to='home')=>`<button onclick="go('${to}')">← Back</button>`;
+const opts=a=>a.map(o=>`<option>${esc(o)}</option>`).join('');
+
+/* ===== Views ===== */
+const V={
+home:()=>`<div class="hero"><h1>Breakdown tyre management</h1><p>Scan the vehicle, inspect NSD, swap tyres and sync with SAP – in one guided flow.</p></div>${M()}
+ <div class="tiles"><button class="tl pri" onclick="go('newbd')"><span class="ic">＋</span><b>New BD</b><small>Open a breakdown and start tyre work</small></button>
+ <button class="tl" onclick="go('exist')"><span class="ic">⌕</span><b>Existing BD</b><small>Continue by SAP MO number</small></button></div>
+ <button onclick="go('master')">Vehicle master &amp; barcode</button>`,
+newbd:()=>`${back()}<div class="card"><h2>New BD</h2>${M()}
+ <label>Order Type</label><select id="ot">${opts(CFG.orderTypes)}</select>
+ <label>BD Type</label><select id="bt">${opts(CFG.bdTypes)}</select>
+ <label>BD Date &amp; Time (default: server time; max ±10 min)</label><input type="datetime-local" id="dt" value="${loc(now())}">
+ <div class="row"><button class="p" onclick="openBD()">Open</button></div></div>`,
+exist:()=>`${back()}<div class="card"><h2>Existing BD</h2>${M()}<label>SAP MO number</label><input id="mo" inputmode="numeric" placeholder="e.g. 4000001">
+ <div class="row"><button class="p" onclick="findMO()">Search</button></div></div>`,
+master:()=>`${back()}<div class="card"><h2>Vehicle master</h2>
+ <div>Vehicle: <b>${esc(S.veh.no)}</b> · Barcode: <b>${esc(S.veh.barcode)}</b> (permanent)</div>
+ <div id="bc" style="margin:10px 0;background:#fff;color:#000;display:inline-block;padding:6px;overflow-x:auto;max-width:100%"><svg id="bcs"></svg><div>${esc(S.veh.no)}</div></div>
+ <button onclick="print()">Print barcode</button>
+ <div class="w" style="margin-top:12px"><table><tr><th>Axle</th><th>LHS</th><th>RHS</th></tr>${S.veh.axles.map(a=>`<tr><td>${a.name}</td><td>${a.pos[0]}</td><td>${a.pos[1]}</td></tr>`).join('')}</table></div>
+ <div class="mu">Tyres are not stored on the barcode; the axle-position mapping below is dynamic.</div></div>`,
+scan:()=>`${back(bd.mo?'exist':'home')}<div class="card"><h2>Scan vehicle barcode</h2><div class="mu">${bdTag()}</div>${M()}
+ <div id="reader" style="width:100%;min-height:220px;background:#000;border-radius:8px"></div><div class="row"><button class="p" onclick="startCam()">Start camera</button><button onclick="stopCam();$('camst').textContent='Camera stopped.'">Stop</button></div><div class="mu" id="camst">Starting camera…</div>
+ <div class="mu">Test: open “Vehicle master &amp; barcode” on another screen and point the camera at it.</div>
+ <label>Or enter barcode manually</label><input id="mb" placeholder="${esc(S.veh.barcode)}"><div class="row"><button class="p" onclick="doScan($('mb').value)">Load vehicle</button><button onclick="doScan(S.veh.barcode)">Trial: use sample barcode</button></div></div>`,
+veh:()=>{const v=S.veh,act=bd.status==='OPEN';const tile=p=>{const t=S.tyres[S.map[p]],fitted=bd.fitments.some(f=>f.pos===p);
+ if(!t)return `<div class="tile empty"><div class="pos">${p}</div><div class="ser er">EMPTY</div>${act?`<button class="p" onclick="go('veh',{panel:'fit',pos:'${p}'})">Fit tyre</button>`:''}</div>`;
+ const pc=Math.max(4,Math.min(100,t.nsd/16*100)),col=t.nsd<4?'var(--er)':t.nsd<8?'var(--wa)':'var(--ok)';
+ return `<div class="tile ${ui.pos===p&&ui.panel?'sel':''}"><div class="pos">${p}${fitted?' · <span class="ok">NEW</span>':''}</div><div class="ser">${t.serial}</div>
+ <div class="bar"><i style="width:${pc}%;background:${col}"></i></div>
+ <div class="kv"><span>NSD</span><b>${t.nsd} mm</b><span>Life</span><b>${t.life} km</b><span>Fitted</span><b>${fdd(t.lastFit)}</b><span>Inspected</span><b>${fdd(t.lastInsp)}</b></div>
+ <div class="mu">${t.make} ${t.size}</div>${act&&!fitted?`<button onclick="go('veh',{panel:'rm',pos:'${p}'})">Inspect / Remove</button>`:''}</div>`};
+ return `${back('home')}<div class="card"><div class="vh"><div><small>VEHICLE</small><h2>${esc(v.no)}</h2></div><div class="mu">Barcode ${esc(v.barcode)}</div></div><div class="mu" style="margin-top:6px">${bdTag()}</div></div>${M()}
+ ${ui.panel==='rm'?rmPanel():ui.panel==='fit'?fitPanel():''}
+ <div class="card">${v.axles.map(a=>`<div class="axle"><div class="al">${a.name}</div>${tile(a.pos[0])}<div class="shaft"></div>${tile(a.pos[1])}</div>`).join('')}</div>
+ <div class="row"><button class="p" onclick="go('final')">Final check</button></div>`},
+final:()=>{const c=checks();return `${back('veh')}<div class="card"><h2>Final check</h2><div class="mu">${bdTag()}</div>${M()}
+ <b>Removals</b><div class="w"><table><tr><th>Pos</th><th>Tyre</th><th>Old NSD</th><th>New NSD</th><th>Condition</th><th>Bucket</th></tr>${bd.removals.map(r=>`<tr><td>${r.pos}</td><td>${r.serial}</td><td>${r.oldNsd}</td><td>${r.newNsd}</td><td>${esc(r.cond)}</td><td>${esc(r.bucket)}</td></tr>`).join('')||'<tr><td colspan="6">None</td></tr>'}</table></div>
+ <b>Fitments</b><div class="w"><table><tr><th>Pos</th><th>Tyre</th><th>NSD</th><th>Add Cut Type</th></tr>${bd.fitments.map(f=>`<tr><td>${f.pos}</td><td>${f.serial}</td><td>${f.nsd}</td><td>${esc(f.addCut)}</td></tr>`).join('')||'<tr><td colspan="4">None</td></tr>'}</table></div>
+ ${c.length?`<div class="msg er"><b>Fix before submit:</b><br>${c.map(esc).join('<br>')}</div>`:'<div class="msg ok">All validations passed.</div>'}
+ ${syncBox()}
+ <div class="row"><button class="p" ${c.length||busy||syncOK()?'disabled':''} onclick="submitSAP()">${bd.sync&&bd.sync.status==='FAILED'?'Retry submit':'Submit'}</button>
+ <button ${bd.status==='OPEN'?'':'disabled'} onclick="go('close')">Close BD…</button></div></div>`},
+close:()=>{const c=closeChecks();return `${back('final')}<div class="card"><h2>Close BD</h2><div class="mu">${bdTag()}</div>${M()}
+ ${c.map(x=>`<div class="${x[0]?'ok':'er'}">${x[0]?'✔':'✘'} ${esc(x[1])}</div>`).join('')}
+ ${bd.status==='CLOSED'?`<div class="msg ok">BD closed at ${fd(bd.closeTs)}</div>`:c.every(x=>x[0])?`<label>Closing date &amp; time (server time ±10 min)</label><input type="datetime-local" id="cdt" value="${loc(now())}"><div class="row"><button class="p" onclick="closeBD()">Confirm close</button></div>`:'<div class="mu">Closing is available only when all validations pass.</div>'}</div>`}
+};
+const $=id=>document.getElementById(id);
+const fdd=t=>t?new Date(t).toLocaleDateString():'—';
+const ST=['Scan','Inspect','Fit','Review','Close'];
+const LOGO='<svg width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#1b2a29" stroke="#f0a202" stroke-width="3"/><circle cx="16" cy="16" r="5" fill="#f0a202"/></svg>';
+function hdr(){const k=ui.s==='scan'?0:ui.s==='veh'?(ui.panel==='fit'?2:1):ui.s==='final'?3:ui.s==='close'?4:-1;
+ return `<div class="hb"><div class="lg">${LOGO}<div><b>TyreOps</b><small>Breakdown tyre management</small></div></div>${bd&&k>=0?`<span class="chip">${esc(bd.id)}</span>`:''}</div>${k>=0?`<div class="steps">${ST.map((x,i)=>`<span class="${i<k?'dn':i===k?'ac':''}"><i>${i<k?'✓':i+1}</i>${x}</span>`).join('')}</div>`:''}`}
+const bdTag=()=>`BD ${esc(bd.id)}${bd.mo?' · MO '+esc(bd.mo):''} · ${esc(bd.orderType)} · ${esc(bd.bdType)} · opened ${fd(bd.openTs)} · <b>${bd.status}</b>`;
+const syncOK=()=>bd.sync&&bd.sync.status==='SUCCESS'&&bd.sync.key===curKey();
+const curKey=()=>bd.id+'-'+bd.removals.length+'-'+bd.fitments.length;
+const syncBox=()=>bd.sync?`<div class="msg ${bd.sync.status==='SUCCESS'?'ok':bd.sync.status==='FAILED'?'er':'wa'}"><b>SAP sync: ${bd.sync.status}</b><br>${esc(bd.sync.message||'')}${bd.sync.resp?`<pre>${esc(JSON.stringify(bd.sync.resp,null,1))}</pre>`:''}</div>`:'';
+function rmPanel(){const t=S.tyres[S.map[ui.pos]];return `<div class="card"><h2>Inspect &amp; remove – ${ui.pos}</h2><div>Tyre <b>${t.serial}</b> · existing NSD <b>${t.nsd}</b> mm</div>
+ <label>Newly measured NSD (mm)</label><input id="nn" type="number" step="0.1" min="0" max="30">
+ <label>Tyre condition → inventory bucket</label><select id="cd">${Object.entries(CFG.conds).map(([k,v])=>`<option value="${esc(k)}">${esc(k)} → ${esc(v)}</option>`).join('')}</select>
+ <div class="row"><button class="p" onclick="removeTyre()">Remove tyre</button><button onclick="go('veh')">Cancel</button></div></div>`}
+function fitPanel(){const q=(ui.q||'').toUpperCase();const l=Object.values(S.tyres).filter(t=>CFG.avail.includes(t.bucket)&&(!q||t.serial.includes(q)));
+ const sel=ui.sel&&S.tyres[ui.sel];
+ return `<div class="card"><h2>Fit tyre – ${ui.pos}</h2><label>Search available inventory by serial</label>
+ <div class="row"><input id="q" value="${esc(ui.q||'')}" placeholder="e.g. D1234"><button onclick="ui.q=$('q').value;ui.sel=null;render()">Search</button></div>
+ <div class="w"><table><tr><th>Serial</th><th>Bucket</th><th>NSD</th><th>Life</th><th>Make/Size</th><th></th></tr>${l.map(t=>`<tr><td>${t.serial}</td><td>${t.bucket}</td><td>${t.nsd}</td><td>${t.life}</td><td>${t.make} ${t.size}</td><td><button onclick="ui.sel='${t.serial}';render()">Select</button></td></tr>`).join('')||'<tr><td colspan="6">No available tyre found</td></tr>'}</table></div>
+ ${sel?`<hr><div>Selected: <b>${sel.serial}</b></div><label>NSD (mm)</label><input id="fn" type="number" step="0.1" value="${sel.nsd}">
+ <label>Add Cut Type</label><select id="ac"><option value="">— select —</option>${opts(CFG.addCuts)}</select>
+ <div class="row"><button class="p" onclick="fitTyre()">Fit tyre</button></div>`:''}
+ <div class="row"><button onclick="go('veh')">Cancel</button></div></div>`}
+
+function render(){if(ui.s==='home'||ui.s==='newbd'||ui.s==='exist'||ui.s==='master'){}
+ $('top').innerHTML=hdr();$('app').innerHTML=V[ui.s]();
+ if(ui.s==='master')try{JsBarcode('#bcs',S.veh.barcode,{format:'CODE128',width:3,height:110,margin:20,displayValue:true,background:'#ffffff',lineColor:'#000000'})}catch(e){}
+ if(ui.s==='scan')startCam();msg(null)}
+
+/* ===== Actions ===== */
+function newBD(extra){return{id:'BD'+Date.now().toString(36).toUpperCase(),status:'OPEN',openTs:now().toISOString(),removals:[],fitments:[],sync:null,mo:null,barcode:null,...extra}}
+function openBD(){const v=$('dt').value;if(!okTime(v)){return go('newbd',{msg:{t:'BD time must be within 10 minutes of server time ('+fd(now())+').',c:'er'}})}
+ bd=newBD({orderType:$('ot').value,bdType:$('bt').value,openTs:new Date(v).toISOString(),serverOpenTs:now().toISOString()});S.bds[bd.id]=bd;save();go('scan')}
+function findMO(){const m=S.sap.mos[($('mo').value||'').trim()];
+ if(!m)return go('exist',{msg:{t:'MO not found in SAP. Existing BD workflow cannot continue.',c:'er'}});
+ bd=Object.values(S.bds).find(b=>b.mo===m.mo)||newBD({mo:m.mo,sapBdNo:m.bdNo,barcode:m.barcode,orderType:m.orderType,bdType:m.bdType,openTs:m.openTs});
+ S.bds[bd.id]=bd;save();go('scan',{msg:{t:'MO '+m.mo+' found (BD '+m.bdNo+'). Scan the vehicle.',c:'ok'}})}
+let qOn=false,lastC='',cnt=0;
+function qStop(){if(qOn){qOn=false;try{Quagga.offDetected();Quagga.stop()}catch(e){}}}
+async function startCam(){scanOn=true;const st=$('camst');if(!st)return;
+ if(!window.Quagga){st.textContent='Scanner library failed to load (check internet) – use manual entry.';return}
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){st.textContent='Camera API unavailable (needs HTTPS or a local file opened in Chrome).';return}
+ qStop();lastC='';cnt=0;st.textContent='Requesting camera permission…';
+ Quagga.init({inputStream:{type:'LiveStream',target:$('reader'),constraints:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}},area:{top:'15%',right:'3%',left:'3%',bottom:'15%'}},
+  locator:{patchSize:'medium',halfSample:false},numOfWorkers:0,frequency:10,locate:true,decoder:{readers:['code_128_reader']}},err=>{
+  if(err){const m=String(err.message||err);st.textContent=/denied|NotAllowed|Permission/i.test(m)?'Camera permission denied. Allow camera for this site, then tap Start camera.':'Camera error: '+m;return}
+  Quagga.start();qOn=true;st.textContent='Camera on – hold the barcode flat across the red line, 20–30 cm away, bright and steady.'});
+ Quagga.offDetected();
+ Quagga.onDetected(r=>{if(!scanOn)return;const c=r.codeResult&&r.codeResult.code;if(!c)return;
+  const e=(r.codeResult.decodedCodes||[]).filter(x=>x.error!==undefined).map(x=>x.error);const avg=e.length?e.reduce((a,b)=>a+b,0)/e.length:0;
+  if(avg>0.15)return;if(c===lastC)cnt++;else{lastC=c;cnt=1}
+  st.textContent='Reading: '+c+' ('+cnt+'/2)';if(cnt>=2){scanOn=false;doScan(c)}})}
+function doScan(code){code=(code||'').trim();
+ if(code!==S.veh.barcode)return go('scan',{msg:{t:'Unknown barcode "'+code+'".',c:'er'}});
+ if(bd.barcode&&bd.barcode!==code)return go('scan',{msg:{t:'This vehicle does not belong to the selected MO/BD.',c:'er'}});
+ bd.barcode=code;save();go('veh')}
+function removeTyre(){const p=ui.pos,t=S.tyres[S.map[p]],n=parseFloat($('nn').value);
+ if(isNaN(n)||n<0||n>30)return go('veh',{panel:'rm',pos:p,msg:{t:'Enter a valid new NSD.',c:'er'}});
+ const cond=$('cd').value,bucket=CFG.conds[cond],ts=now().toISOString();
+ bd.removals.push({pos:p,serial:t.serial,oldNsd:t.nsd,newNsd:n,cond,bucket,ts});
+ t.nsd=n;t.lastInsp=ts;t.bucket=bucket;t.pos=null;S.map[p]=null;
+ S.hist.push({serial:t.serial,ev:'REMOVE',pos:p,bd:bd.id,ts,nsd:n,bucket});save();go('veh',{panel:'fit',pos:p,msg:{t:t.serial+' removed → '+bucket+'. Now fit a replacement.',c:'ok'}})}
+function fitTyre(){const p=ui.pos,t=S.tyres[ui.sel],n=parseFloat($('fn').value),ac=$('ac').value;
+ const e=m=>go('veh',{panel:'fit',pos:p,sel:ui.sel,q:ui.q,msg:{t:m,c:'er'}});
+ if(S.map[p])return e('Position is not empty.');if(!t||!CFG.avail.includes(t.bucket))return e('Tyre is not available for fitment.');
+ if(isNaN(n)||n<0)return e('Enter a valid NSD.');if(!ac)return e('Select an Add Cut Type.');
+ const ts=now().toISOString();bd.fitments.push({pos:p,serial:t.serial,nsd:n,addCut:ac,ts});
+ t.nsd=n;t.bucket='Fitted';t.pos=p;t.lastFit=ts;t.lastInsp=ts;S.map[p]=t.serial;
+ S.hist.push({serial:t.serial,ev:'FIT',pos:p,bd:bd.id,ts,nsd:n,addCut:ac});save();go('veh',{msg:{t:t.serial+' fitted to '+p,c:'ok'}})}
+function checks(){const e=[];if(!bd.removals.length&&!bd.fitments.length)e.push('No tyre transactions recorded.');
+ const fs=new Set();bd.removals.forEach(r=>{if(!bd.fitments.some(f=>f.pos===r.pos))e.push('Removed tyre '+r.serial+' at '+r.pos+' has no replacement.');
+  if(r.newNsd==null||!r.bucket)e.push('Removal at '+r.pos+' missing NSD/bucket.');const t=S.tyres[r.serial];if(t.bucket!==r.bucket||S.map[r.pos]===r.serial)e.push('Inventory mismatch for removed tyre '+r.serial)});
+ bd.fitments.forEach(f=>{if(!bd.removals.some(r=>r.pos===f.pos))e.push('Fitment at '+f.pos+' has no recorded removal.');
+  if(S.map[f.pos]!==f.serial||S.tyres[f.serial].bucket!=='Fitted')e.push('Axle map/inventory mismatch for '+f.serial);
+  if(!f.addCut)e.push('Add Cut Type missing at '+f.pos);if(f.nsd==null||isNaN(f.nsd))e.push('NSD missing at '+f.pos);
+  if(fs.has(f.serial))e.push('Duplicate tyre '+f.serial);fs.add(f.serial)});return e}
+async function submitSAP(){if(busy||syncOK()||checks().length)return;busy=true;const key=curKey();
+ bd.sync={status:'PENDING',key,message:'Waiting for SAP…'};save();render();
+ const payload={idempotencyKey:key,moNo:bd.mo,orderType:bd.orderType,bdType:bd.bdType,openTs:bd.openTs,vehicleNo:S.veh.no,barcode:bd.barcode,removals:bd.removals,fitments:bd.fitments};
+ try{const r=await sapCall(payload);
+  if(r&&r.status==='S'&&r.bdNo&&r.moNo){bd.mo=r.moNo;bd.sapBdNo=r.bdNo;bd.sync={status:'SUCCESS',key,message:r.message,resp:r}}
+  else bd.sync={status:'FAILED',key,message:(r&&r.message)||'Invalid or unsuccessful SAP response',resp:r}}
+ catch(e){bd.sync={status:'FAILED',key,message:'API error: '+e.message}}
+ busy=false;save();go('final')}
+function closeChecks(){const c=[];const empty=POS.filter(p=>!S.map[p]);
+ c.push([!empty.length,'Every axle position has a tyre mounted'+(empty.length?' (empty: '+empty.join(', ')+')':'')]);
+ const bad=POS.filter(p=>S.map[p]&&(S.tyres[S.map[p]].bucket!=='Fitted'||S.tyres[S.map[p]].pos!==p));
+ c.push([!bad.length,'Axle mapping consistent with inventory']);
+ c.push([!checks().length&&(bd.removals.length+bd.fitments.length)>0,'All removals and fitments complete']);
+ c.push([syncOK(),'Data synchronized successfully with SAP'+(bd.sync?' (status '+bd.sync.status+')':' (not submitted)')]);
+ c.push([!(bd.sync&&['PENDING','FAILED'].includes(bd.sync.status)),'No pending or failed API transaction']);return c}
+function closeBD(){if(!closeChecks().every(x=>x[0]))return;const v=$('cdt').value;
+ if(!okTime(v)||new Date(v)<new Date(bd.openTs))return go('close',{msg:{t:'Closing time must be within 10 minutes of server time and after BD opening.',c:'er'}});
+ bd.status='CLOSED';bd.closeTs=new Date(v).toISOString();bd.serverCloseTs=now().toISOString();save();go('close')}
+syncTime().then(render);
+</script></body></html>
