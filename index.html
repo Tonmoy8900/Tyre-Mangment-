@@ -4,6 +4,8 @@
 <title>Tyre Management – BD</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700&display=swap">
 <style>
 :root{color-scheme:light dark;--bg:#eef2f1;--card:#fff;--tx:#10201f;--mu:#5b6d6b;--bd:#d5dedd;--ac:#0b6e69;--acx:#fff;--am:#f0a202;--ok:#13804a;--er:#c2352b;--wa:#a86a00;--hd:#10201f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -51,7 +53,7 @@ pre{white-space:pre-wrap;font-size:12px;background:var(--bg);padding:8px;border-
 .tile button{padding:7px 8px;font-size:13px;width:100%}.bar{height:7px;border-radius:4px;background:var(--bg);overflow:hidden}.bar i{display:block;height:100%}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:1px 8px;font-size:12px}.kv span{color:var(--mu)}.kv b{font-weight:600;text-align:right}
 #reader{position:relative;overflow:hidden;border-radius:12px}#reader video{width:100%;display:block}#reader canvas{display:none}#reader::after{content:"";position:absolute;left:3%;right:3%;top:50%;border-top:2px solid #f33}
-@media print{body *{visibility:hidden}#bc,#bc *{visibility:visible}#bc{position:absolute;left:0;top:0}}
+@media print{body *{visibility:hidden}#bc,#bc *,#lab,#lab *{visibility:visible}#bc,#lab{position:absolute;left:0;top:0;width:100%}}
 </style></head><body><header id="top"></header><main id="app"></main>
 <script>
 /* ===== Configuration (SAP integration) ===== */
@@ -105,7 +107,7 @@ const V={
 home:()=>`<div class="hero"><h1>Breakdown tyre management</h1><p>Scan the vehicle, inspect NSD, swap tyres and sync with SAP – in one guided flow.</p></div>${M()}
  <div class="tiles"><button class="tl pri" onclick="go('newbd')"><span class="ic">＋</span><b>New BD</b><small>Open a breakdown and start tyre work</small></button>
  <button class="tl" onclick="go('exist')"><span class="ic">⌕</span><b>Existing BD</b><small>Continue by SAP MO number</small></button></div>
- <button onclick="go('master')">Vehicle master &amp; barcode</button>`,
+ <div class="row"><button class="p" onclick="go('bdl')">BD list (open / closed)</button><button onclick="go('master')">Vehicle master &amp; barcode</button></div>`,
 newbd:()=>`${back()}<div class="card"><h2>New BD</h2>${M()}
  <label>Order Type</label><select id="ot">${opts(CFG.orderTypes)}</select>
  <label>BD Type</label><select id="bt">${opts(CFG.bdTypes)}</select>
@@ -115,18 +117,19 @@ exist:()=>`${back()}<div class="card"><h2>Existing BD</h2>${M()}<label>SAP MO nu
  <div class="row"><button class="p" onclick="findMO()">Search</button></div></div>`,
 master:()=>`${back()}<div class="card"><h2>Vehicle master (${S.vehs.length})</h2>${M()}
  <input id="vq" placeholder="Search vehicle number or barcode" value="${esc(ui.vq||'')}" oninput="ui.vq=this.value;vlist()">
- <div class="row"><button class="p" onclick="go('vadd')">+ Add vehicle</button></div><div id="vl" class="w" style="margin-top:8px"></div></div>
+ <div class="row"><button class="p" onclick="go('vadd')">+ Add vehicle</button><button onclick="csvVeh()">Export barcode list (CSV)</button><button onclick="xlsOut('veh')">Excel (.xlsx)</button><button onclick="go('labels')">Barcode labels (PDF)</button></div><div id="vl" class="w" style="margin-top:8px"></div><div id="cx"></div></div>
  <div class="card"><h2>Move vehicles between devices</h2><div class="mu">Export on the device where vehicles were added, copy the text, paste it on the other device and tap Import.</div>
  <textarea id="xio" rows="4" style="width:100%;margin-top:8px;border:1px solid var(--bd);border-radius:12px;padding:8px;background:var(--bg);color:var(--tx);font:12px monospace"></textarea>
  <div class="row"><button onclick="exportData()">Export</button><button class="p" onclick="importData()">Import</button></div><div id="xmsg"></div></div>`,
 vadd:()=>`${back('master')}<div class="card"><h2>Add vehicle</h2>
  <label>Vehicle number</label><input id="vn" placeholder="e.g. WB-12-AB-3456" style="text-transform:uppercase">
+ <label>Equipment no (optional – defaults to vehicle number)</label><input id="eq" placeholder="e.g. 10004567" style="text-transform:uppercase">
  <label>Number of axles</label><select id="na" onchange="drawAx()">${[2,3,4,5,6].map(n=>`<option ${n===4?'selected':''}>${n}</option>`).join('')}</select>
  <label>Tyre make / size / initial NSD (mm)</label><div class="row"><input id="tm" placeholder="Make" value="MRF"><input id="ts" placeholder="Size" value="295/80R22.5"><input id="tn" type="number" step="0.1" value="12"></div>
  <label>Tyre serial numbers fitted now</label><div id="axf"></div><div id="verr"></div>
  <div class="mu" style="margin-top:8px">The permanent barcode is generated and saved automatically.</div>
  <div class="row"><button class="p" onclick="saveVeh()">Save vehicle &amp; generate barcode</button></div></div>`,
-vdet:()=>{const v=S.vehs.find(x=>x.id===ui.vid);return `${back('master')}<div class="card"><h2>${esc(v.no)}</h2><div class="mu">Permanent barcode: <b>${esc(v.barcode)}</b></div>
+vdet:()=>{const v=S.vehs.find(x=>x.id===ui.vid);return `${back('master')}<div class="card"><h2>${esc(v.no)}</h2><div class="mu">Equipment no: <b>${esc(v.eq||v.no)}</b> · Permanent barcode: <b>${esc(v.barcode)}</b></div>
  <div id="bc" style="margin:10px 0;background:#fff;color:#000;display:inline-block;padding:6px;overflow-x:auto;max-width:100%"><svg id="bcs"></svg><div>${esc(v.no)}</div></div>
  <div class="row"><button class="p" onclick="print()">Print barcode</button></div>
  <div class="w" style="margin-top:12px"><table><tr><th>Axle</th><th>LHS tyre</th><th>RHS tyre</th></tr>${v.axles.map(a=>`<tr><td>${a.name}</td>${a.pos.map(p=>`<td>${p}: <b>${v.map[p]||'—'}</b></td>`).join('')}</tr>`).join('')}</table></div>
@@ -146,6 +149,15 @@ veh:()=>{const v=cv,act=bd.status==='OPEN';const tile=p=>{const t=S.tyres[cv.map
  ${ui.panel==='rm'?rmPanel():ui.panel==='fit'?fitPanel():''}
  <div class="card">${v.axles.map(a=>`<div class="axle"><div class="al">${a.name}</div>${tile(a.pos[0])}<div class="shaft"></div>${tile(a.pos[1])}</div>`).join('')}</div>
  <div class="row"><button class="p" onclick="go('final')">Final check</button></div>`},
+labels:()=>`${back('master')}<div class="card"><h2>Barcode labels (PDF)</h2><div class="mu">Click Print, then choose “Save as PDF” as the printer. One label per vehicle, with equipment no.</div><div class="row"><button class="p" onclick="pdfLabels()">Download PDF</button><button onclick="print()">Print</button></div><div class="mu" style="margin-top:6px">If Print does nothing, the preview is blocking it. Use Download PDF, or open your GitHub link.</div><div id="pe"></div></div>
+ <div id="lab" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;background:#fff;color:#000;padding:10px;border-radius:12px">${S.vehs.map((v,i)=>`<div style="border:1px solid #999;padding:6px;text-align:center;break-inside:avoid"><svg id="lb${i}"></svg><div><b>${esc(v.no)}</b></div><div style="font-size:12px">Equipment: ${esc(v.eq||v.no)}</div></div>`).join('')}</div>`,
+bdl:()=>{const f=ui.f||'ALL',all=Object.values(S.bds),n=x=>all.filter(b=>b.status===x).length;
+ const l=all.filter(b=>f==='ALL'||b.status===f).sort((a,b)=>new Date(b.openTs)-new Date(a.openTs));
+ return `${back()}<div class="card"><h2>BD list</h2>${M()}<div class="mu">Open: <b class="wa">${n('OPEN')}</b> · Closed: <b class="ok">${n('CLOSED')}</b></div>
+ <div class="row">${['ALL','OPEN','CLOSED'].map(x=>`<button class="${f===x?'p':''}" onclick="go('bdl',{f:'${x}'})">${x==='ALL'?'All':x[0]+x.slice(1).toLowerCase()}</button>`).join('')}</div>
+ <div class="w" style="margin-top:10px"><table><tr><th>BD</th><th>MO</th><th>Vehicle</th><th>BD type</th><th>Opened</th><th>Closed</th><th>Status</th><th>SAP</th><th></th></tr>
+ ${l.map(b=>{const v=S.vehs.find(x=>x.barcode===b.barcode);return `<tr><td>${esc(b.id)}</td><td>${esc(b.mo||'—')}</td><td>${esc(v?v.no:'—')}</td><td>${esc(b.bdType)}</td><td>${fd(b.openTs)}</td><td>${fd(b.closeTs)}</td><td><b class="${b.status==='OPEN'?'wa':'ok'}">${b.status}</b></td><td>${b.sync?b.sync.status:'—'}</td><td>${b.status==='OPEN'?`<button class="p" onclick="resumeBD('${b.id}')">Continue</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="9">No BD found</td></tr>'}</table></div>
+ <div class="row"><button onclick="csvBD()">Export BD list (CSV)</button><button onclick="xlsOut('bd')">Excel (.xlsx)</button></div><div id="cx"></div></div>`},
 final:()=>{const c=checks();return `${back('veh')}<div class="card"><h2>Final check</h2><div class="mu">${bdTag()}</div>${M()}
  <b>Removals</b><div class="w"><table><tr><th>Pos</th><th>Tyre</th><th>Old NSD</th><th>New NSD</th><th>Condition</th><th>Bucket</th></tr>${bd.removals.map(r=>`<tr><td>${r.pos}</td><td>${r.serial}</td><td>${r.oldNsd}</td><td>${r.newNsd}</td><td>${esc(r.cond)}</td><td>${esc(r.bucket)}</td></tr>`).join('')||'<tr><td colspan="6">None</td></tr>'}</table></div>
  <b>Fitments</b><div class="w"><table><tr><th>Pos</th><th>Tyre</th><th>NSD</th><th>Add Cut Type</th></tr>${bd.fitments.map(f=>`<tr><td>${f.pos}</td><td>${f.serial}</td><td>${f.nsd}</td><td>${esc(f.addCut)}</td></tr>`).join('')||'<tr><td colspan="4">None</td></tr>'}</table></div>
@@ -183,7 +195,7 @@ function fitPanel(){const q=(ui.q||'').toUpperCase();const l=Object.values(S.tyr
 
 function render(){if(ui.s==='home'||ui.s==='newbd'||ui.s==='exist'||ui.s==='master'){}
  $('top').innerHTML=hdr();$('app').innerHTML=V[ui.s]();
- if(ui.s==='vdet')try{JsBarcode('#bcs',S.vehs.find(x=>x.id===ui.vid).barcode,{format:'CODE128',width:3,height:110,margin:20,displayValue:true,background:'#ffffff',lineColor:'#000000'})}catch(e){}if(ui.s==='master')vlist();if(ui.s==='vadd')drawAx();
+ if(ui.s==='vdet')try{JsBarcode('#bcs',S.vehs.find(x=>x.id===ui.vid).barcode,{format:'CODE128',width:3,height:110,margin:20,displayValue:true,background:'#ffffff',lineColor:'#000000'})}catch(e){}if(ui.s==='master')vlist();if(ui.s==='labels')S.vehs.forEach((v,i)=>{try{JsBarcode('#lb'+i,v.barcode,{format:'CODE128',width:2,height:60,margin:8,displayValue:true,background:'#ffffff',lineColor:'#000000'});fitSvg($('lb'+i))}catch(e){}});if(ui.s==='vadd')drawAx();
  if(ui.s==='scan')startCam();msg(null)}
 
 /* ===== Actions ===== */
@@ -214,8 +226,25 @@ function importData(){let d;try{d=JSON.parse($('xio').value)}catch(e){return $('
  if(!d||!Array.isArray(d.vehs))return $('xmsg').innerHTML='<div class="msg er">Invalid data.</div>';let n=0;
  d.vehs.forEach(v=>{if(S.vehs.some(x=>x.no===v.no||x.barcode===v.barcode))return;Object.values(v.map).forEach(sr=>{if(!S.tyres[sr]&&d.tyres[sr])S.tyres[sr]=d.tyres[sr]});S.vehs.push(v);n++});
  save();vlist();$('xmsg').innerHTML='<div class="msg ok">Imported '+n+' new vehicle(s); existing ones were skipped.</div>'}
+function resumeBD(id){bd=S.bds[id];cv=S.vehs.find(v=>v.barcode===bd.barcode)||null;cv?go('veh'):go('scan')}
+let LR=[],QUIET=false;function csvOut(name,rows){LR=rows;const q=x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"';const t=rows.map(r=>r.map(q).join(',')).join('\n');
+ $('cx').innerHTML='<div class="msg ok">'+(rows.length-1)+' row(s). A download starts automatically; if it does not, copy the text below into Notepad and save it as .csv (opens in Excel).</div><textarea id="cxt" rows="6" style="width:100%;border:1px solid var(--bd);border-radius:12px;padding:8px;background:var(--bg);color:var(--tx);font:12px monospace"></textarea>';$('cxt').value=t;
+ if(!QUIET)try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+t],{type:'text/csv'}));a.download=name;document.body.appendChild(a);a.click();a.remove()}catch(e){}}
+function csvVeh(){csvOut('vehicle-barcodes.csv',[['Equipment no','Vehicle no','Barcode','Axles','Tyres fitted (position:serial)']].concat(S.vehs.map(v=>[v.eq||v.no,v.no,v.barcode,v.axles.length,v.axles.flatMap(a=>a.pos).map(p=>p+':'+(v.map[p]||'')).join('; ')])))}
+function csvBD(){csvOut('bd-list.csv',[['BD id','SAP BD no','MO no','Equipment no','Vehicle no','Order type','BD type','Opened','Closed','Status','SAP sync','Removals','Fitments']].concat(Object.values(S.bds).sort((a,b)=>new Date(b.openTs)-new Date(a.openTs)).map(b=>{const v=S.vehs.find(x=>x.barcode===b.barcode);return [b.id,b.sapBdNo||'',b.mo||'',v?(v.eq||v.no):'',v?v.no:'',b.orderType,b.bdType,b.openTs,b.closeTs||'',b.status,b.sync?b.sync.status:'',b.removals.length,b.fitments.length]})))}
+function fitSvg(el){const w=parseFloat(el.getAttribute('width')),h=parseFloat(el.getAttribute('height'));if(!el.getAttribute('viewBox'))el.setAttribute('viewBox','0 0 '+w+' '+h);el.removeAttribute('width');el.removeAttribute('height');el.style.cssText='width:100%;height:auto;display:block'}
+function wsFit(rows){const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=rows[0].map((_,i)=>({wch:Math.min(70,Math.max(...rows.map(r=>String(r[i]==null?'':r[i]).length))+2)}));return ws}
+function pdfLabels(){try{const d=new window.jspdf.jsPDF({unit:'mm',format:'a4'}),cw=62,ch=36,gx=4,gy=4,cols=3,rows=7,per=cols*rows,mx=(210-cols*cw-(cols-1)*gx)/2,my=14;
+ d.setFontSize(12);S.vehs.forEach((v,i)=>{const k=i%per;if(i&&k===0)d.addPage();const x=mx+(k%cols)*(cw+gx),y=my+Math.floor(k/cols)*(ch+gy);
+ const c=document.createElement('canvas');JsBarcode(c,v.barcode,{format:'CODE128',width:3,height:70,margin:10,displayValue:true,fontSize:22,background:'#ffffff'});
+ const iw=cw-6,ih=Math.min(ch-14,iw*c.height/c.width);d.setDrawColor(150);d.rect(x,y,cw,ch);d.addImage(c.toDataURL('image/png'),'PNG',x+(cw-iw)/2,y+2,iw,ih);
+ d.setFontSize(10);d.setFont('helvetica','bold');d.text(String(v.no),x+cw/2,y+ch-8,{align:'center'});d.setFont('helvetica','normal');d.setFontSize(8);d.text('Equipment: '+(v.eq||v.no),x+cw/2,y+ch-3.5,{align:'center'})});
+ d.save('barcode-labels.pdf')}catch(e){$('pe').innerHTML='<div class="msg er">PDF download is not available here ('+esc(e.message||e)+'). Open your GitHub link, or use Print.</div>'}}
+function xlsOut(kind){QUIET=true;(kind==='bd'?csvBD:csvVeh)();QUIET=false;
+ try{const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,wsFit(LR),kind==='bd'?'BD list':'Barcodes');XLSX.writeFile(wb,kind==='bd'?'bd-list.xlsx':'vehicle-barcodes.xlsx')}
+ catch(e){$('cx').insertAdjacentHTML('afterbegin','<div class="msg er">Excel download is not available here (blocked or library not loaded). Use the CSV text below.</div>')}}
 function vlist(){const q=(ui.vq||'').toUpperCase();const l=S.vehs.filter(v=>!q||v.no.includes(q)||v.barcode.includes(q));
- $('vl').innerHTML='<table><tr><th>Vehicle</th><th>Barcode</th><th>Axles</th><th></th></tr>'+(l.map(v=>`<tr><td><b>${esc(v.no)}</b></td><td>${esc(v.barcode)}</td><td>${v.axles.length}</td><td><button onclick="go('vdet',{vid:'${v.id}'})">Barcode / View</button></td></tr>`).join('')||'<tr><td colspan="4">No vehicles</td></tr>')+'</table>'}
+ $('vl').innerHTML='<table><tr><th>Equipment no</th><th>Vehicle</th><th>Barcode</th><th>Axles</th><th></th></tr>'+(l.map(v=>`<tr><td>${esc(v.eq||v.no)}</td><td><b>${esc(v.no)}</b></td><td>${esc(v.barcode)}</td><td>${v.axles.length}</td><td><button onclick="go('vdet',{vid:'${v.id}'})">Barcode / View</button></td></tr>`).join('')||'<tr><td colspan="4">No vehicles</td></tr>')+'</table>'}
 function drawAx(){const n=+$('na').value;$('axf').innerHTML=Array.from({length:n},(_,i)=>`<div class="mu" style="margin-top:6px">Axle ${i+1}</div><div class="row"><input id="s${i+1}L" placeholder="A${i+1} LHS serial"><input id="s${i+1}R" placeholder="A${i+1} RHS serial"></div>`).join('')}
 function saveVeh(){const no=$('vn').value.trim().toUpperCase(),n=+$('na').value,nsd=parseFloat($('tn').value);
  const er=m=>{$('verr').innerHTML='<div class="msg er">'+esc(m)+'</div>'};
@@ -224,7 +253,7 @@ function saveVeh(){const no=$('vn').value.trim().toUpperCase(),n=+$('na').value,
  for(let i=1;i<=n;i++){const pos=['A'+i+'-LHS','A'+i+'-RHS'];axles.push({id:'A'+i,name:'Axle '+i,pos});
   for(const [k,p] of [['L',pos[0]],['R',pos[1]]]){const x=$('s'+i+k).value.trim().toUpperCase();if(!x)return er('Enter the tyre serial for '+p+'.');if(ser.includes(x)||S.tyres[x])return er('Tyre serial '+x+' is duplicate or already exists.');ser.push(x);map[p]=x}}
  const num=Math.max(0,...S.vehs.map(v=>parseInt(v.barcode.slice(-4))||0))+1,ts=now().toISOString();
- const v={id:'V'+Date.now().toString(36),no,barcode:'TYR-VEH-'+String(num).padStart(4,'0'),axles,map};
+ const v={id:'V'+Date.now().toString(36),no,eq:$('eq').value.trim().toUpperCase()||no,barcode:'TYR-VEH-'+String(num).padStart(4,'0'),axles,map};
  Object.entries(map).forEach(([p,x])=>{S.tyres[x]={serial:x,make:$('tm').value.trim(),size:$('ts').value.trim(),bucket:'Fitted',pos:p,nsd,life:0,lastFit:ts,lastInsp:ts};S.hist.push({serial:x,ev:'FIT',veh:no,pos:p,bd:'MASTER',ts})});
  S.vehs.push(v);save();go('vdet',{vid:v.id})}
 function doScan(code){code=(code||'').trim();
